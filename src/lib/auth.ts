@@ -28,6 +28,16 @@ export async function signInWithPassword(email: string, password: string): Promi
   if (error) throw error
 }
 
+/** Anmod om adgang — opretter en pending-konto */
+export async function requestAccess(email: string, password: string): Promise<'confirm_email' | 'pending'> {
+  if (!hasSupabase) throw new Error('Supabase er ikke konfigureret')
+  const { data, error } = await supabase!.auth.signUp({ email, password })
+  if (error) throw error
+  // Supabase returnerer en session med det samme hvis email-bekræftelse er slået fra,
+  // ellers er session null og brugeren skal bekræfte email.
+  return data.session ? 'pending' : 'confirm_email'
+}
+
 export async function sendPasswordReset(email: string): Promise<void> {
   if (!hasSupabase) throw new Error('Supabase er ikke konfigureret')
   const { error } = await supabase!.auth.resetPasswordForEmail(email, {
@@ -39,15 +49,6 @@ export async function sendPasswordReset(email: string): Promise<void> {
 export async function updatePassword(newPassword: string): Promise<void> {
   if (!hasSupabase) throw new Error('Supabase er ikke konfigureret')
   const { error } = await supabase!.auth.updateUser({ password: newPassword })
-  if (error) throw error
-}
-
-export async function sendMagicLink(email: string): Promise<void> {
-  if (!hasSupabase) throw new Error('Supabase er ikke konfigureret')
-  const { error } = await supabase!.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.origin }
-  })
   if (error) throw error
 }
 
