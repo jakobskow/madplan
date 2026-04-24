@@ -135,3 +135,10 @@ export async function removeMember(memberId: string): Promise<void> {
   const { error } = await supabase!.from('household_members').delete().eq('id', memberId)
   if (error) throw error
 }
+
+/** Ejeren sletter hele husstanden (medlemmer slettes automatisk via CASCADE) */
+export async function deleteHousehold(householdId: string): Promise<void> {
+  if (!hasSupabase) return
+  const { error } = await supabase!.from('households').delete().eq('id', householdId)
+  if (error) throw error
+}

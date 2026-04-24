@@ -9,6 +9,7 @@ import {
   leaveOrDeclineHousehold,
   removeMember,
   renameHousehold,
+  deleteHousehold,
   HouseholdWithMembers,
   PendingInvitation,
 } from '../lib/households'
@@ -115,6 +116,17 @@ export default function Household() {
     }
   }
 
+  async function handleDelete(h: HouseholdWithMembers) {
+    if (!confirm(`Slet "${h.name}" permanent? Alle medlemmer mister adgang til den fælles plan.`)) return
+    setActionId(h.id)
+    try {
+      await deleteHousehold(h.id)
+      await load()
+    } finally {
+      setActionId(null)
+    }
+  }
+
   if (loading)
     return <div className="text-muted text-sm animate-pulse">Indlæser husstand…</div>
 
@@ -185,14 +197,24 @@ export default function Household() {
                     {h.isOwner ? 'Ejer' : 'Medlem'} · {h.members.filter(m => m.status === 'accepted').length} {h.members.filter(m => m.status === 'accepted').length === 1 ? 'medlem' : 'medlemmer'}
                   </p>
                 </div>
-                {!h.isOwner && (
-                  <button
-                    className="btn btn-ghost text-sm text-red-500 hover:bg-red-50"
-                    onClick={() => handleLeave(h)}
-                  >
-                    Forlad
-                  </button>
-                )}
+                <div className="flex gap-2 shrink-0">
+                  {h.isOwner ? (
+                    <button
+                      className="btn btn-ghost text-sm text-red-500 hover:bg-red-50"
+                      disabled={actionId === h.id}
+                      onClick={() => handleDelete(h)}
+                    >
+                      {actionId === h.id ? '…' : 'Slet husstand'}
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-ghost text-sm text-red-500 hover:bg-red-50"
+                      onClick={() => handleLeave(h)}
+                    >
+                      Forlad
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Medlemsliste */}
