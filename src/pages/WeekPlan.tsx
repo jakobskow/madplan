@@ -16,6 +16,7 @@ import { exportWeekXlsx } from '../lib/export/exportXlsx'
 import { exportWeekPdf } from '../lib/export/exportPdf'
 import { getMyHouseholds, HouseholdWithMembers } from '../lib/households'
 import { useSession } from '../lib/auth'
+import { getDefaultHouseholdId, setDefaultHouseholdId } from '../lib/defaultHousehold'
 
 function emptyWeek(): Record<number, Record<Slot, string | null>> {
   const out: Record<number, Record<Slot, string | null>> = {}
@@ -39,11 +40,23 @@ export default function WeekPlan() {
   const [households, setHouseholds] = useState<HouseholdWithMembers[]>([])
   const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(null)
 
-  // Load households once user is known
+  // Load households and restore default selection
   useEffect(() => {
     if (!myUserId) return
-    getMyHouseholds(myUserId).then(setHouseholds)
+    getMyHouseholds(myUserId).then((hh) => {
+      setHouseholds(hh)
+      // Restore saved default (only if it's still a valid household)
+      const saved = getDefaultHouseholdId(myUserId)
+      if (saved && hh.some((h) => h.id === saved)) {
+        setSelectedHouseholdId(saved)
+      }
+    })
   }, [myUserId])
+
+  function selectPlan(householdId: string | null) {
+    setSelectedHouseholdId(householdId)
+    setDefaultHouseholdId(myUserId, householdId)
+  }
 
   async function loadAll() {
     const ms = await listMeals()
@@ -105,7 +118,7 @@ export default function WeekPlan() {
       {households.length > 0 && (
         <div className="flex gap-2 flex-wrap mb-4">
           <button
-            onClick={() => setSelectedHouseholdId(null)}
+            onClick={() => selectPlan(null)}
             className={`btn text-sm ${selectedHouseholdId === null ? 'btn-primary' : 'btn-ghost'}`}
           >
             Min plan
@@ -113,7 +126,7 @@ export default function WeekPlan() {
           {households.map((h) => (
             <button
               key={h.id}
-              onClick={() => setSelectedHouseholdId(h.id)}
+              onClick={() => selectPlan(h.id)}
               className={`btn text-sm ${selectedHouseholdId === h.id ? 'btn-primary' : 'btn-ghost'}`}
             >
               🏠 {h.name}

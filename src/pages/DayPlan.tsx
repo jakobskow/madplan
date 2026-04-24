@@ -6,6 +6,7 @@ import { currentIsoWeek, isoDayOfWeek } from '../lib/iso-week'
 import { randomDay } from '../lib/random'
 import { getMyHouseholds, HouseholdWithMembers } from '../lib/households'
 import { useSession } from '../lib/auth'
+import { getDefaultHouseholdId, setDefaultHouseholdId } from '../lib/defaultHousehold'
 
 export default function DayPlan() {
   const { session } = useSession()
@@ -21,11 +22,22 @@ export default function DayPlan() {
   const [households, setHouseholds] = useState<HouseholdWithMembers[]>([])
   const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(null)
 
-  // Load households once user is known
+  // Load households and restore default selection
   useEffect(() => {
     if (!myUserId) return
-    getMyHouseholds(myUserId).then(setHouseholds)
+    getMyHouseholds(myUserId).then((hh) => {
+      setHouseholds(hh)
+      const saved = getDefaultHouseholdId(myUserId)
+      if (saved && hh.some((h) => h.id === saved)) {
+        setSelectedHouseholdId(saved)
+      }
+    })
   }, [myUserId])
+
+  function selectPlan(householdId: string | null) {
+    setSelectedHouseholdId(householdId)
+    setDefaultHouseholdId(myUserId, householdId)
+  }
 
   async function load() {
     setMeals(await listMeals())
@@ -72,7 +84,7 @@ export default function DayPlan() {
       {households.length > 0 && (
         <div className="flex gap-2 flex-wrap mb-4">
           <button
-            onClick={() => setSelectedHouseholdId(null)}
+            onClick={() => selectPlan(null)}
             className={`btn text-sm ${selectedHouseholdId === null ? 'btn-primary' : 'btn-ghost'}`}
           >
             Min plan
@@ -80,7 +92,7 @@ export default function DayPlan() {
           {households.map((h) => (
             <button
               key={h.id}
-              onClick={() => setSelectedHouseholdId(h.id)}
+              onClick={() => selectPlan(h.id)}
               className={`btn text-sm ${selectedHouseholdId === h.id ? 'btn-primary' : 'btn-ghost'}`}
             >
               🏠 {h.name}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from '../lib/auth'
+import { getDefaultHouseholdId, setDefaultHouseholdId } from '../lib/defaultHousehold'
 import {
   getMyHouseholds,
   getMyPendingInvitations,
@@ -28,6 +29,7 @@ export default function Household() {
   const [inviting,     setInviting]     = useState<string | null>(null)
   const [err,          setErr]          = useState<Record<string, string>>({})
   const [actionId,     setActionId]     = useState<string | null>(null)
+  const [defaultId,    setDefaultId]    = useState<string | null>(() => getDefaultHouseholdId(myUserId))
 
   const load = useCallback(async () => {
     if (!myUserId) return
@@ -110,10 +112,17 @@ export default function Household() {
     setActionId(myMember.id)
     try {
       await leaveOrDeclineHousehold(myMember.id)
+      if (defaultId === h.id) { setDefaultHouseholdId(myUserId, null); setDefaultId(null) }
       await load()
     } finally {
       setActionId(null)
     }
+  }
+
+  function handleSetDefault(h: HouseholdWithMembers) {
+    const next = defaultId === h.id ? null : h.id
+    setDefaultHouseholdId(myUserId, next)
+    setDefaultId(next)
   }
 
   async function handleDelete(h: HouseholdWithMembers) {
@@ -121,6 +130,7 @@ export default function Household() {
     setActionId(h.id)
     try {
       await deleteHousehold(h.id)
+      if (defaultId === h.id) { setDefaultHouseholdId(myUserId, null); setDefaultId(null) }
       await load()
     } finally {
       setActionId(null)
@@ -192,19 +202,33 @@ export default function Household() {
               {/* Header */}
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-semibold text-ink">{h.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-ink">{h.name}</h3>
+                    {defaultId === h.id && (
+                      <span className="px-1.5 py-0.5 text-[11px] rounded-full bg-sage-soft text-sage-dark font-medium">
+                        Standard
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted">
                     {h.isOwner ? 'Ejer' : 'Medlem'} · {h.members.filter(m => m.status === 'accepted').length} {h.members.filter(m => m.status === 'accepted').length === 1 ? 'medlem' : 'medlemmer'}
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
+                  <button
+                    className={`btn text-sm ${defaultId === h.id ? 'btn-sage' : 'btn-ghost'}`}
+                    onClick={() => handleSetDefault(h)}
+                    title={defaultId === h.id ? 'Fjern som standard' : 'Sæt som standard'}
+                  >
+                    {defaultId === h.id ? '★ Standard' : '☆ Standard'}
+                  </button>
                   {h.isOwner ? (
                     <button
                       className="btn btn-ghost text-sm text-red-500 hover:bg-red-50"
                       disabled={actionId === h.id}
                       onClick={() => handleDelete(h)}
                     >
-                      {actionId === h.id ? '…' : 'Slet husstand'}
+                      {actionId === h.id ? '…' : 'Slet'}
                     </button>
                   ) : (
                     <button
