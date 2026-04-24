@@ -22,6 +22,26 @@ export function useSession(): { session: Session | null; loading: boolean; cloud
   return { session, loading, cloud: hasSupabase }
 }
 
+export async function signInWithPassword(email: string, password: string): Promise<void> {
+  if (!hasSupabase) throw new Error('Supabase er ikke konfigureret')
+  const { error } = await supabase!.auth.signInWithPassword({ email, password })
+  if (error) throw error
+}
+
+export async function sendPasswordReset(email: string): Promise<void> {
+  if (!hasSupabase) throw new Error('Supabase er ikke konfigureret')
+  const { error } = await supabase!.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`
+  })
+  if (error) throw error
+}
+
+export async function updatePassword(newPassword: string): Promise<void> {
+  if (!hasSupabase) throw new Error('Supabase er ikke konfigureret')
+  const { error } = await supabase!.auth.updateUser({ password: newPassword })
+  if (error) throw error
+}
+
 export async function sendMagicLink(email: string): Promise<void> {
   if (!hasSupabase) throw new Error('Supabase er ikke konfigureret')
   const { error } = await supabase!.auth.signInWithOtp({
