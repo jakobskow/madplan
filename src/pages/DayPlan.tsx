@@ -4,8 +4,13 @@ import { listMeals, listWeekPlan, upsertPlanEntry } from '../lib/data'
 import { MealPicker } from '../components/MealPicker'
 import { currentIsoWeek, isoDayOfWeek } from '../lib/iso-week'
 import { randomDay } from '../lib/random'
+import { getMyHouseholds, HouseholdWithMembers } from '../lib/households'
+import { useSession } from '../lib/auth'
 
 export default function DayPlan() {
+  const { session } = useSession()
+  const myUserId = session?.user?.id ?? ''
+
   const [{ year, week }] = useState(currentIsoWeek())
   const [day, setDay] = useState(isoDayOfWeek(new Date()))
   const [meals, setMeals] = useState<Meal[]>([])
@@ -13,10 +18,18 @@ export default function DayPlan() {
     Object.fromEntries(SLOTS.map((s) => [s, null])) as Record<Slot, string | null>
   )
   const [picker, setPicker] = useState<Slot | null>(null)
+  const [households, setHouseholds] = useState<HouseholdWithMembers[]>([])
+  const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(null)
+
+  // Load households once user is known
+  useEffect(() => {
+    if (!myUserId) return
+    getMyHouseholds(myUserId).then(setHouseholds)
+  }, [myUserId])
 
   async function load() {
     setMeals(await listMeals())
-    const plan = await listWeekPlan(year, week)
+    const plan = await listWeekPlan(year, week, selectedHouseholdId)
     const row = Object.fromEntries(SLOTS.map((s) => [s, null])) as Record<Slot, string | null>
     for (const p of plan) if (p.day_of_week === day) row[p.slot] = p.meal_id ?? null
     setEntries(row)
@@ -24,7 +37,7 @@ export default function DayPlan() {
 
   useEffect(() => {
     load()
-  }, [year, week, day])
+  }, [year, week, day, selectedHouseholdId])
 
   const mealsById = useMemo(() => {
     const m: Record<string, Meal> = {}
@@ -34,13 +47,13 @@ export default function DayPlan() {
 
   async function set(slot: Slot, mealId: string | null) {
     setEntries((prev) => ({ ...prev, [slot]: mealId }))
-    await upsertPlanEntry({ year, week, day_of_week: day, slot, meal_id: mealId })
+    await upsertPlanEntry({ year, week, day_of_week: day, slot, meal_id: mealId }, selectedHouseholdId)
   }
 
   async function randomize() {
     const r = randomDay(meals)
     setEntries(r)
-    for (const s of SLOTS) await upsertPlanEntry({ year, week, day_of_week: day, slot: s, meal_id: r[s] })
+    for (const s of SLOTS) await upsertPlanEntry({ year, week, day_of_week: day, slot: s, meal_id: r[s] }, selectedHouseholdId)
   }
 
   const SLOT_ICON: Record<Slot, string> = {
@@ -55,6 +68,27 @@ export default function DayPlan() {
 
   return (
     <div>
+      {/* ── Plan-vælger (kun hvis brugeren har hustande) ─────────── */}
+      {households.length > 0 && (
+        <div className="flex gap-2 flex-wrap mb-4">
+          <button
+            onClick={() => setSelectedHouseholdId(null)}
+            className={`btn text-sm ${selectedHouseholdId === null ? 'btn-primary' : 'btn-ghost'}`}
+          >
+            Min plan
+          </button>
+          {households.map((h) => (
+            <button
+              key={h.id}
+              onClick={() => setSelectedHouseholdId(h.id)}
+              className={`btn text-sm ${selectedHouseholdId === h.id ? 'btn-primary' : 'btn-ghost'}`}
+            >
+              🏠 {h.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div>
           <h1 className="font-display text-3xl font-semibold text-ink">{DAYS[day - 1]}</h1>

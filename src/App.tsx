@@ -6,6 +6,7 @@ import DayPlan from './pages/DayPlan'
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
 import Admin from './pages/Admin'
+import Household from './pages/Household'
 import { useSession, signOut } from './lib/auth'
 import { ensureSeeded } from './lib/data'
 import { getMyProfile, Profile } from './lib/profiles'
@@ -51,6 +52,16 @@ function Shell({
             >
               Bibliotek
             </NavLink>
+            {cloud && (
+              <NavLink
+                to="/household"
+                className={({ isActive }) =>
+                  `btn ${isActive ? 'btn-primary' : 'btn-ghost'}`
+                }
+              >
+                Husstand
+              </NavLink>
+            )}
             {isAdmin && (
               <NavLink
                 to="/admin"
@@ -239,6 +250,9 @@ export default function App() {
         <Route path="/week"           element={<WeekPlan />} />
         <Route path="/day"            element={<DayPlan />} />
         <Route path="/library"        element={<Library />} />
+        {cloud && (
+          <Route path="/household" element={<Household />} />
+        )}
         {isAdmin && (
           <Route path="/admin" element={<Admin />} />
         )}

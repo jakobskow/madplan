@@ -6,9 +6,9 @@ import { SEED_MEALS } from './seed'
 // - Hvis Supabase er konfigureret (env vars sat) → bruger cloud (cross-device, auth).
 // - Ellers → bruger localStorage (single-device, intet login nødvendigt).
 
-const LS_MEALS = 'mealplanner.meals.v1'
-const LS_PLANS = 'mealplanner.plans.v1'
-const LS_SEEDED = 'mealplanner.seeded.v1'
+const LS_MEALS   = 'mealplanner.meals.v1'
+const LS_PLANS   = 'mealplanner.plans.v1'
+const LS_SEEDED  = 'mealplanner.seeded.v1'
 
 function uuid() {
   if (crypto?.randomUUID) return crypto.randomUUID()
@@ -55,6 +55,7 @@ export async function ensureSeeded(): Promise<void> {
 
 export async function listMeals(): Promise<Meal[]> {
   if (isCloudMode()) {
+    // RLS returnerer automatisk egne + husstand-kollegaers måltider
     const { data, error } = await supabase!.from('meals').select('*').order('name')
     if (error) throw error
     return data as Meal[]
@@ -98,7 +99,6 @@ export async function deleteMeal(id: string): Promise<void> {
   }
   const meals = lsRead<Meal[]>(LS_MEALS, []).filter((m) => m.id !== id)
   lsWrite(LS_MEALS, meals)
-  // Clear references in plans
   const plans = lsRead<MealPlanEntry[]>(LS_PLANS, []).map((p) =>
     p.meal_id === id ? { ...p, meal_id: null } : p
   )
@@ -106,14 +106,22 @@ export async function deleteMeal(id: string): Promise<void> {
 }
 
 // --- Plans ---
+// householdId = undefined/null → personlig plan
+// householdId = uuid           → delt husstandsplan
 
-export async function listWeekPlan(year: number, week: number): Promise<MealPlanEntry[]> {
+export async function listWeekPlan(
+  year: number,
+  week: number,
+  householdId?: string | null
+): Promise<MealPlanEntry[]> {
   if (isCloudMode()) {
-    const { data, error } = await supabase!
-      .from('meal_plans')
-      .select('*')
-      .eq('year', year)
-      .eq('week', week)
+    let q = supabase!.from('meal_plans').select('*').eq('year', year).eq('week', week)
+    if (householdId) {
+      q = q.eq('household_id', householdId)
+    } else {
+      q = q.is('household_id', null)
+    }
+    const { data, error } = await q
     if (error) throw error
     return data as MealPlanEntry[]
   }
@@ -121,17 +129,18 @@ export async function listWeekPlan(year: number, week: number): Promise<MealPlan
   return plans.filter((p) => p.year === year && p.week === week)
 }
 
-export async function upsertPlanEntry(entry: MealPlanEntry): Promise<void> {
+export async function upsertPlanEntry(
+  entry: MealPlanEntry,
+  householdId?: string | null
+): Promise<void> {
   if (isCloudMode()) {
-    const payload = {
-      year: entry.year,
-      week: entry.week,
-      day_of_week: entry.day_of_week,
-      slot: entry.slot,
-      meal_id: entry.meal_id
-    }
-    const { error } = await supabase!.from('meal_plans').upsert(payload, {
-      onConflict: 'user_id,year,week,day_of_week,slot'
+    const { error } = await supabase!.rpc('upsert_plan_entry', {
+      p_year:         entry.year,
+      p_week:         entry.week,
+      p_day:          entry.day_of_week,
+      p_slot:         entry.slot,
+      p_meal_id:      entry.meal_id ?? null,
+      p_household_id: householdId ?? null,
     })
     if (error) throw error
     return
@@ -149,9 +158,17 @@ export async function upsertPlanEntry(entry: MealPlanEntry): Promise<void> {
   lsWrite(LS_PLANS, plans)
 }
 
-export async function clearWeek(year: number, week: number): Promise<void> {
+export async function clearWeek(
+  year: number,
+  week: number,
+  householdId?: string | null
+): Promise<void> {
   if (isCloudMode()) {
-    const { error } = await supabase!.from('meal_plans').delete().eq('year', year).eq('week', week)
+    const { error } = await supabase!.rpc('clear_week_plan', {
+      p_year:         year,
+      p_week:         week,
+      p_household_id: householdId ?? null,
+    })
     if (error) throw error
     return
   }
@@ -164,25 +181,27 @@ export async function clearWeek(year: number, week: number): Promise<void> {
 export async function setWeekEntries(
   year: number,
   week: number,
-  entries: Record<number, Record<Slot, string | null>>
+  entries: Record<number, Record<Slot, string | null>>,
+  householdId?: string | null
 ): Promise<void> {
-  // Opdater alle slots i én batch
   const rows: MealPlanEntry[] = []
   for (const day of Object.keys(entries).map(Number)) {
     for (const slot of Object.keys(entries[day]) as Slot[]) {
       rows.push({ year, week, day_of_week: day, slot, meal_id: entries[day][slot] })
     }
   }
+
   if (isCloudMode()) {
     const payload = rows.map((r) => ({
-      year: r.year,
-      week: r.week,
       day_of_week: r.day_of_week,
-      slot: r.slot,
-      meal_id: r.meal_id
+      slot:        r.slot,
+      meal_id:     r.meal_id ?? null,
     }))
-    const { error } = await supabase!.from('meal_plans').upsert(payload, {
-      onConflict: 'user_id,year,week,day_of_week,slot'
+    const { error } = await supabase!.rpc('set_week_entries', {
+      p_year:         year,
+      p_week:         week,
+      p_entries:      payload,
+      p_household_id: householdId ?? null,
     })
     if (error) throw error
     return
