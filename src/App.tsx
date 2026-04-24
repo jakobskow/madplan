@@ -4,6 +4,7 @@ import Library from './pages/Library'
 import WeekPlan from './pages/WeekPlan'
 import DayPlan from './pages/DayPlan'
 import Login from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import { useSession, signOut } from './lib/auth'
 import { ensureSeeded, isCloudMode } from './lib/data'
 import { Logo } from './components/Logo'
@@ -86,6 +87,7 @@ export default function App() {
   if (cloud && !session) {
     return (
       <Routes>
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="*" element={<Login />} />
       </Routes>
     )
@@ -102,6 +104,7 @@ export default function App() {
     <Shell>
       <Routes>
         <Route path="/" element={<Navigate to="/week" replace />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/week" element={<WeekPlan />} />
         <Route path="/day" element={<DayPlan />} />
         <Route path="/library" element={<Library />} />
