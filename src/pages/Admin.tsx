@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { listAllProfiles, updateProfile, Profile } from '../lib/profiles'
+import { useSession } from '../lib/auth'
 
 type Tab = 'pending' | 'all'
 
@@ -19,6 +20,8 @@ const ROLE_LABEL: Record<Profile['role'], string> = {
 }
 
 export default function Admin() {
+  const { session }             = useSession()
+  const myUserId                = session?.user?.id
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [loading, setLoading]   = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
@@ -171,7 +174,7 @@ export default function Admin() {
                   </>
                 )}
 
-                {p.status === 'approved' && p.role === 'admin' && (
+                {p.status === 'approved' && p.role === 'admin' && p.user_id !== myUserId && (
                   <button
                     className="btn btn-ghost text-sm"
                     disabled={updating === p.user_id}
@@ -180,6 +183,9 @@ export default function Admin() {
                   >
                     Fjern admin
                   </button>
+                )}
+                {p.status === 'approved' && p.role === 'admin' && p.user_id === myUserId && (
+                  <span className="text-xs text-muted italic">Din konto</span>
                 )}
 
                 {p.status === 'rejected' && (
