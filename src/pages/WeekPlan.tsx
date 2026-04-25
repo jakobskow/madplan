@@ -217,6 +217,11 @@ export default function WeekPlan() {
         entries={entries}
         mealsById={mealsById}
         onCellClick={(day, slot) => setPicker({ day, slot })}
+        todayDay={(() => {
+          const cw = currentIsoWeek()
+          if (year !== cw.year || week !== cw.week) return undefined
+          return new Date().getDay() || 7
+        })()}
       />
 
       {picker && (

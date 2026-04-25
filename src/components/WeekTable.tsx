@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { DAYS, Meal, SLOTS, SLOT_LABELS, Slot } from '../types'
 
 const SLOT_ICON: Record<Slot, string> = {
@@ -23,23 +24,46 @@ const SLOT_TINT: Record<Slot, string> = {
 export function WeekTable({
   entries,
   mealsById,
-  onCellClick
+  onCellClick,
+  todayDay,
 }: {
   entries: Record<number, Record<Slot, string | null>>
   mealsById: Record<string, Meal>
   onCellClick: (day: number, slot: Slot) => void
+  todayDay?: number
 }) {
+  const dayRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  useEffect(() => {
+    if (todayDay == null) return
+    const el = dayRefs.current[todayDay - 1]
+    if (!el) return
+    setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 150)
+  }, [todayDay])
+
   return (
     <>
       {/* ── Mobil: dag-kort ──────────────────────────────────────── */}
       <div className="md:hidden flex flex-col gap-3">
         {DAYS.map((dayName, idx) => {
           const day = idx + 1
+          const isToday = todayDay === day
           const row = entries[day] ?? ({} as Record<Slot, string | null>)
           return (
-            <div key={day} className="card overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-line bg-cream/60">
+            <div
+              key={day}
+              ref={(el) => { dayRefs.current[idx] = el }}
+              className={`card overflow-hidden ${isToday ? 'ring-2 ring-terracotta/50' : ''}`}
+            >
+              <div className={`px-4 py-2.5 border-b border-line flex items-center gap-2 ${isToday ? 'bg-terracotta/10' : 'bg-cream/60'}`}>
                 <span className="font-display text-[15px] font-semibold text-ink">{dayName}</span>
+                {isToday && (
+                  <span className="text-[11px] font-medium text-terracotta-dark bg-terracotta/15 px-2 py-0.5 rounded-full">
+                    I dag
+                  </span>
+                )}
               </div>
               <div className="divide-y divide-line">
                 {SLOTS.map((slot) => {
@@ -94,11 +118,16 @@ export function WeekTable({
           <tbody>
             {DAYS.map((dayName, idx) => {
               const day = idx + 1
+              const isToday = todayDay === day
               const row = entries[day] ?? ({} as Record<Slot, string | null>)
               return (
-                <tr key={day} className="border-b border-line last:border-0 hover:bg-cream/40">
+                <tr
+                  key={day}
+                  className={`border-b border-line last:border-0 ${isToday ? 'bg-terracotta/5 hover:bg-terracotta/10' : 'hover:bg-cream/40'}`}
+                >
                   <td className="p-3 align-top font-display text-ink">
                     <div className="text-[15px]">{dayName}</div>
+                    {isToday && <div className="text-[10px] text-terracotta font-medium mt-0.5">I dag</div>}
                   </td>
                   {SLOTS.map((slot) => {
                     const mealId = row[slot]
