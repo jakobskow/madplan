@@ -29,7 +29,7 @@ function emptyWeek(): Record<number, Record<Slot, string | null>> {
 }
 
 export default function WeekPlan() {
-  const { session } = useSession()
+  const { session, cloud } = useSession()
   const myUserId = session?.user?.id ?? ''
 
   const [{ year, week }, setYW] = useState(currentIsoWeek())
@@ -39,17 +39,20 @@ export default function WeekPlan() {
   const [exportOpen, setExportOpen] = useState(false)
   const [households, setHouseholds] = useState<HouseholdWithMembers[]>([])
   const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(null)
+  // Prevents loading the plan before we know which household is the default.
+  // In local mode (no cloud) we're ready immediately.
+  const [householdsReady, setHouseholdsReady] = useState(!cloud)
 
   // Load households and restore default selection
   useEffect(() => {
     if (!myUserId) return
     getMyHouseholds(myUserId).then((hh) => {
       setHouseholds(hh)
-      // Restore saved default (only if it's still a valid household)
       const saved = getDefaultHouseholdId(myUserId)
       if (saved && hh.some((h) => h.id === saved)) {
         setSelectedHouseholdId(saved)
       }
+      setHouseholdsReady(true)
     })
   }, [myUserId])
 
@@ -71,8 +74,9 @@ export default function WeekPlan() {
   }
 
   useEffect(() => {
+    if (!householdsReady) return
     loadAll()
-  }, [year, week, selectedHouseholdId])
+  }, [year, week, selectedHouseholdId, householdsReady])
 
   const mealsById = useMemo(() => {
     const m: Record<string, Meal> = {}

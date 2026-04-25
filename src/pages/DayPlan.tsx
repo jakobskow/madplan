@@ -9,7 +9,7 @@ import { useSession } from '../lib/auth'
 import { getDefaultHouseholdId, setDefaultHouseholdId } from '../lib/defaultHousehold'
 
 export default function DayPlan() {
-  const { session } = useSession()
+  const { session, cloud } = useSession()
   const myUserId = session?.user?.id ?? ''
 
   const [{ year, week }] = useState(currentIsoWeek())
@@ -21,6 +21,7 @@ export default function DayPlan() {
   const [picker, setPicker] = useState<Slot | null>(null)
   const [households, setHouseholds] = useState<HouseholdWithMembers[]>([])
   const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(null)
+  const [householdsReady, setHouseholdsReady] = useState(!cloud)
 
   // Load households and restore default selection
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function DayPlan() {
       if (saved && hh.some((h) => h.id === saved)) {
         setSelectedHouseholdId(saved)
       }
+      setHouseholdsReady(true)
     })
   }, [myUserId])
 
@@ -48,8 +50,9 @@ export default function DayPlan() {
   }
 
   useEffect(() => {
+    if (!householdsReady) return
     load()
-  }, [year, week, day, selectedHouseholdId])
+  }, [year, week, day, selectedHouseholdId, householdsReady])
 
   const mealsById = useMemo(() => {
     const m: Record<string, Meal> = {}
