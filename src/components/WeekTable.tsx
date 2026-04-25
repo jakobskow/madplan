@@ -1,4 +1,4 @@
-import { DAYS, Meal, SLOTS, SLOT_LABELS, Slot, slotCategory } from '../types'
+import { DAYS, Meal, SLOTS, SLOT_LABELS, Slot } from '../types'
 
 const SLOT_ICON: Record<Slot, string> = {
   morgenmad: '🥣',
@@ -30,69 +30,112 @@ export function WeekTable({
   onCellClick: (day: number, slot: Slot) => void
 }) {
   return (
-    <div className="overflow-x-auto card">
-      <table className="text-sm" style={{ minWidth: 1100 }}>
-        <thead>
-          <tr className="border-b border-line">
-            <th className="p-3 text-left font-display text-base text-ink" style={{ width: 100 }}>
-              Dag
-            </th>
-            {SLOTS.map((s) => (
-              <th
-                key={s}
-                className={`p-3 text-left font-display text-base text-ink ${SLOT_TINT[s]}`}
-                style={{ width: 170 }}
-              >
-                <span className="mr-1.5">{SLOT_ICON[s]}</span>
-                {SLOT_LABELS[s]}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {DAYS.map((dayName, idx) => {
-            const day = idx + 1
-            const row = entries[day] ?? ({} as Record<Slot, string | null>)
-            return (
-              <tr key={day} className="border-b border-line last:border-0 hover:bg-cream/40">
-                <td className="p-3 align-top font-display text-ink">
-                  <div className="text-[15px]">{dayName}</div>
-                </td>
+    <>
+      {/* ── Mobil: dag-kort ──────────────────────────────────────── */}
+      <div className="md:hidden flex flex-col gap-3">
+        {DAYS.map((dayName, idx) => {
+          const day = idx + 1
+          const row = entries[day] ?? ({} as Record<Slot, string | null>)
+          return (
+            <div key={day} className="card overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-line bg-cream/60">
+                <span className="font-display text-[15px] font-semibold text-ink">{dayName}</span>
+              </div>
+              <div className="divide-y divide-line">
                 {SLOTS.map((slot) => {
                   const mealId = row[slot]
                   const meal = mealId ? mealsById[mealId] : null
                   return (
-                    <td
+                    <button
                       key={slot}
                       onClick={() => onCellClick(day, slot)}
-                      className={`p-2.5 align-top cursor-pointer border-l border-line/60 transition-colors ${
-                        meal ? 'hover:bg-terracotta-soft/30' : 'cell-empty hover:bg-terracotta-soft/40'
+                      className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${SLOT_TINT[slot]} ${
+                        meal ? 'hover:bg-terracotta-soft/30' : 'hover:bg-terracotta-soft/20'
                       }`}
                     >
-                      {meal ? (
-                        <div>
-                          <div className="font-medium text-[13px] leading-snug text-ink">
-                            {meal.name}
-                          </div>
-                          {meal.description && (
-                            <div className="text-[11px] text-muted line-clamp-2 mt-0.5">
-                              {meal.description}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-muted italic flex items-center justify-center h-10">
-                          + vælg
-                        </div>
-                      )}
-                    </td>
+                      <span className="text-lg shrink-0">{SLOT_ICON[slot]}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-muted font-medium">{SLOT_LABELS[slot]}</div>
+                        {meal ? (
+                          <div className="text-[13px] font-medium text-ink truncate">{meal.name}</div>
+                        ) : (
+                          <div className="text-xs text-muted italic">+ vælg</div>
+                        )}
+                      </div>
+                    </button>
                   )
                 })}
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Desktop: tabel ───────────────────────────────────────── */}
+      <div className="hidden md:block overflow-x-auto card">
+        <table className="text-sm" style={{ minWidth: 1100 }}>
+          <thead>
+            <tr className="border-b border-line">
+              <th className="p-3 text-left font-display text-base text-ink" style={{ width: 100 }}>
+                Dag
+              </th>
+              {SLOTS.map((s) => (
+                <th
+                  key={s}
+                  className={`p-3 text-left font-display text-base text-ink ${SLOT_TINT[s]}`}
+                  style={{ width: 170 }}
+                >
+                  <span className="mr-1.5">{SLOT_ICON[s]}</span>
+                  {SLOT_LABELS[s]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {DAYS.map((dayName, idx) => {
+              const day = idx + 1
+              const row = entries[day] ?? ({} as Record<Slot, string | null>)
+              return (
+                <tr key={day} className="border-b border-line last:border-0 hover:bg-cream/40">
+                  <td className="p-3 align-top font-display text-ink">
+                    <div className="text-[15px]">{dayName}</div>
+                  </td>
+                  {SLOTS.map((slot) => {
+                    const mealId = row[slot]
+                    const meal = mealId ? mealsById[mealId] : null
+                    return (
+                      <td
+                        key={slot}
+                        onClick={() => onCellClick(day, slot)}
+                        className={`p-2.5 align-top cursor-pointer border-l border-line/60 transition-colors ${
+                          meal ? 'hover:bg-terracotta-soft/30' : 'cell-empty hover:bg-terracotta-soft/40'
+                        }`}
+                      >
+                        {meal ? (
+                          <div>
+                            <div className="font-medium text-[13px] leading-snug text-ink">
+                              {meal.name}
+                            </div>
+                            {meal.description && (
+                              <div className="text-[11px] text-muted line-clamp-2 mt-0.5">
+                                {meal.description}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted italic flex items-center justify-center h-10">
+                            + vælg
+                          </div>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }

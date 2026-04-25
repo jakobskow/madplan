@@ -22,77 +22,90 @@ function Shell({
   isAdmin: boolean
 }) {
   const { session, cloud } = useSession()
+  const [navOpen, setNavOpen] = useState(false)
+
+  const navLink = (to: string, label: string) => (
+    <NavLink
+      to={to}
+      onClick={() => setNavOpen(false)}
+      className={({ isActive }) => `btn ${isActive ? 'btn-primary' : 'btn-ghost'}`}
+    >
+      {label}
+    </NavLink>
+  )
+
+  const navLinkMobile = (to: string, label: string) => (
+    <NavLink
+      to={to}
+      onClick={() => setNavOpen(false)}
+      className={({ isActive }) =>
+        `btn ${isActive ? 'btn-primary' : 'btn-ghost'} justify-start w-full`
+      }
+    >
+      {label}
+    </NavLink>
+  )
+
   return (
     <div className="min-h-full flex flex-col">
       <header className="sticky top-0 z-10 backdrop-blur bg-cream/80 border-b border-line">
-        <div className="max-w-6xl mx-auto px-5 py-3 flex items-center gap-6">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-4">
           <Logo />
-          <nav className="flex gap-1 flex-1 ml-4">
-            <NavLink
-              to="/week"
-              className={({ isActive }) =>
-                `btn ${isActive ? 'btn-primary' : 'btn-ghost'}`
-              }
-            >
-              Ugeplan
-            </NavLink>
-            <NavLink
-              to="/day"
-              className={({ isActive }) =>
-                `btn ${isActive ? 'btn-primary' : 'btn-ghost'}`
-              }
-            >
-              Dagsplan
-            </NavLink>
-            <NavLink
-              to="/library"
-              className={({ isActive }) =>
-                `btn ${isActive ? 'btn-primary' : 'btn-ghost'}`
-              }
-            >
-              Bibliotek
-            </NavLink>
-            {cloud && (
-              <NavLink
-                to="/household"
-                className={({ isActive }) =>
-                  `btn ${isActive ? 'btn-primary' : 'btn-ghost'}`
-                }
-              >
-                Husstand
-              </NavLink>
-            )}
-            {isAdmin && (
-              <NavLink
-                to="/admin"
-                className={({ isActive }) =>
-                  `btn ${isActive ? 'btn-primary' : 'btn-ghost'}`
-                }
-              >
-                Admin
-              </NavLink>
-            )}
+
+          {/* Desktop nav */}
+          <nav className="hidden md:flex gap-1 flex-1 ml-4">
+            {navLink('/week', 'Ugeplan')}
+            {navLink('/day', 'Dagsplan')}
+            {navLink('/library', 'Bibliotek')}
+            {cloud && navLink('/household', 'Husstand')}
+            {isAdmin && navLink('/admin', 'Admin')}
           </nav>
-          <div className="text-xs text-muted flex items-center gap-2">
+
+          {/* Desktop: email + log ud */}
+          <div className="hidden md:flex text-xs text-muted items-center gap-2">
             {cloud ? (
               <>
-                <span className="hidden sm:inline">{session?.user?.email}</span>
-                <button className="btn btn-ghost" onClick={() => signOut()}>
-                  Log ud
-                </button>
+                <span className="hidden lg:inline">{session?.user?.email}</span>
+                <button className="btn btn-ghost" onClick={() => signOut()}>Log ud</button>
               </>
             ) : (
-              <span
-                className="px-2.5 py-1 rounded-full bg-sage-soft text-sage-dark text-[11px] font-medium"
-                title="Data gemmes lokalt i browseren"
-              >
+              <span className="px-2.5 py-1 rounded-full bg-sage-soft text-sage-dark text-[11px] font-medium" title="Data gemmes lokalt i browseren">
                 Lokal tilstand
               </span>
             )}
           </div>
+
+          {/* Mobil: hamburger */}
+          <button
+            className="md:hidden ml-auto btn btn-ghost !px-2.5"
+            onClick={() => setNavOpen((v) => !v)}
+            aria-label="Menu"
+          >
+            <span className="text-lg leading-none">{navOpen ? '✕' : '☰'}</span>
+          </button>
         </div>
+
+        {/* Mobil dropdown-menu */}
+        {navOpen && (
+          <div className="md:hidden border-t border-line bg-cream/95 px-4 py-3 flex flex-col gap-1">
+            {navLinkMobile('/week', 'Ugeplan')}
+            {navLinkMobile('/day', 'Dagsplan')}
+            {navLinkMobile('/library', 'Bibliotek')}
+            {cloud && navLinkMobile('/household', 'Husstand')}
+            {isAdmin && navLinkMobile('/admin', 'Admin')}
+            {cloud && (
+              <button
+                className="btn btn-ghost justify-start w-full text-sm mt-1 border-t border-line pt-2"
+                onClick={() => { setNavOpen(false); signOut() }}
+              >
+                Log ud
+              </button>
+            )}
+          </div>
+        )}
       </header>
-      <main className="flex-1 max-w-6xl w-full mx-auto px-5 py-8">
+
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 md:px-5 py-5 md:py-8">
         {children}
       </main>
       <footer className="py-6 text-center text-xs text-muted">
