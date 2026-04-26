@@ -1,11 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { Meal, Category, CATEGORIES, CATEGORY_LABELS } from '../types'
 import { listMeals, createMeal, updateMeal, deleteMeal } from '../lib/data'
-import { importMealFromUrl, ImportedMeal } from '../lib/importMeal'
 import { MealForm } from '../components/MealForm'
 import { Modal } from '../components/Modal'
-import { isCloudMode } from '../lib/data'
 
 const CAT_EMOJI: Record<Category, string> = {
   morgenmad: '🥣',
@@ -30,54 +27,12 @@ export default function Library() {
   const [creating, setCreating] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  // Import fra Instagram
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [showImport, setShowImport] = useState(false)
-  const [importUrl, setImportUrl] = useState('')
-  const [importing, setImporting] = useState(false)
-  const [importError, setImportError] = useState<string | null>(null)
-  const [importPreview, setImportPreview] = useState<ImportedMeal | null>(null)
-
   async function refresh() {
     setMeals(await listMeals())
   }
   useEffect(() => {
     refresh()
   }, [])
-
-  // Håndter ?import=URL fra Web Share Target og iOS Shortcuts
-  useEffect(() => {
-    const urlParam = searchParams.get('import')
-    if (urlParam) {
-      setImportUrl(urlParam)
-      setShowImport(true)
-      setSearchParams({}, { replace: true }) // Ryd URL-param
-      handleImport(urlParam) // Start parse med det samme
-    }
-  }, []) // Kun ved mount
-
-  async function handleImport(url?: string) {
-    const target = url ?? importUrl
-    if (!target.trim()) return
-    setImporting(true)
-    setImportError(null)
-    setImportPreview(null)
-    try {
-      const result = await importMealFromUrl(target.trim())
-      setImportPreview(result)
-    } catch (err) {
-      setImportError(err instanceof Error ? err.message : 'Ukendt fejl')
-    } finally {
-      setImporting(false)
-    }
-  }
-
-  function closeImport() {
-    setShowImport(false)
-    setImportUrl('')
-    setImportPreview(null)
-    setImportError(null)
-  }
 
   const allTags = useMemo(
     () => Array.from(new Set(meals.flatMap((m) => m.tags))).sort(),
@@ -110,16 +65,9 @@ export default function Library() {
             Dine måltider — tag dem, søg dem, brug dem igen.
           </p>
         </div>
-        <div className="flex gap-2">
-          {isCloudMode() && (
-            <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
-              📸 Importér fra link
-            </button>
-          )}
-          <button className="btn btn-primary" onClick={() => setCreating(true)}>
-            + Nyt måltid
-          </button>
-        </div>
+        <button className="btn btn-primary" onClick={() => setCreating(true)}>
+          + Nyt måltid
+        </button>
       </div>
 
       <div className="card p-4 mb-5 space-y-4">
@@ -239,70 +187,6 @@ export default function Library() {
           />
         </Modal>
       )}
-      {/* Import fra Instagram/link modal */}
-      {showImport && (
-        <Modal title="📸 Importér opskrift fra link" onClose={closeImport}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Instagram- eller opskriftslink</label>
-              <div className="flex gap-2">
-                <input
-                  className="input flex-1"
-                  placeholder="https://www.instagram.com/reel/..."
-                  value={importUrl}
-                  onChange={(e) => setImportUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleImport()}
-                />
-                <button
-                  className="btn btn-primary shrink-0"
-                  onClick={() => handleImport()}
-                  disabled={importing || !importUrl.trim()}
-                >
-                  {importing ? '⏳ Henter…' : 'Hent'}
-                </button>
-              </div>
-            </div>
-
-            {importError && (
-              <p className="text-red-600 text-sm p-3 bg-red-50 rounded-lg border border-red-200">
-                ⚠️ {importError}
-              </p>
-            )}
-
-            {importing && (
-              <p className="text-muted text-sm text-center py-4 font-display italic">
-                Læser opskrift og spørger Claude…
-              </p>
-            )}
-
-            {importPreview && !importing && (
-              <div>
-                <p className="text-sm text-muted mb-3">
-                  Tjek oplysningerne og ret hvis nødvendigt, så gemmer vi den.
-                </p>
-                {importPreview.sourceImage && (
-                  <img
-                    src={importPreview.sourceImage}
-                    alt="Preview"
-                    className="w-full h-40 object-cover rounded-lg mb-3"
-                  />
-                )}
-                <MealForm
-                  initial={importPreview}
-                  allTags={allTags}
-                  onCancel={closeImport}
-                  onSave={async (m) => {
-                    await createMeal(m)
-                    closeImport()
-                    refresh()
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
-
       {editing && (
         <Modal title="Redigér måltid" onClose={() => { setEditing(null); setSaveError(null) }}>
           {saveError && (
