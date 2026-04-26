@@ -38,13 +38,13 @@ function EatenButton({
       onClick={onToggle}
       onTouchEnd={onToggle}
       aria-label={isEaten ? 'Fjern markering' : 'Markér som spist'}
-      className={`shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors ${
+      className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
         isEaten
           ? 'bg-emerald-500 border-emerald-500 text-white'
           : 'border-muted/30 text-transparent hover:border-emerald-400 hover:text-emerald-400'
       }`}
     >
-      <svg viewBox="0 0 12 10" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 12 10" className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="1,5 4.5,8.5 11,1" />
       </svg>
     </button>
