@@ -25,6 +25,7 @@ export default function Library() {
   const [activeTags, setActiveTags] = useState<string[]>([])
   const [editing, setEditing] = useState<Meal | null>(null)
   const [creating, setCreating] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   async function refresh() {
     setMeals(await listMeals())
@@ -187,15 +188,25 @@ export default function Library() {
         </Modal>
       )}
       {editing && (
-        <Modal title="Redigér måltid" onClose={() => setEditing(null)}>
+        <Modal title="Redigér måltid" onClose={() => { setEditing(null); setSaveError(null) }}>
+          {saveError && (
+            <p className="text-red-600 text-sm mb-3 p-3 bg-red-50 rounded-lg border border-red-200">
+              ⚠️ {saveError}
+            </p>
+          )}
           <MealForm
             initial={editing}
             allTags={allTags}
-            onCancel={() => setEditing(null)}
+            onCancel={() => { setEditing(null); setSaveError(null) }}
             onSave={async (m) => {
-              await updateMeal(editing.id, m)
-              setEditing(null)
-              refresh()
+              setSaveError(null)
+              try {
+                await updateMeal(editing.id, m)
+                setEditing(null)
+                refresh()
+              } catch (err) {
+                setSaveError(err instanceof Error ? err.message : 'Ukendt fejl – prøv igen.')
+              }
             }}
           />
         </Modal>

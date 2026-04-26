@@ -79,8 +79,9 @@ export async function createMeal(input: Omit<Meal, 'id' | 'user_id' | 'created_a
 
 export async function updateMeal(id: string, input: Partial<Omit<Meal, 'id'>>): Promise<void> {
   if (isCloudMode()) {
-    const { error } = await supabase!.from('meals').update(input).eq('id', id)
+    const { data, error } = await supabase!.from('meals').update(input).eq('id', id).select()
     if (error) throw error
+    if (!data || data.length === 0) throw new Error('Ingen ændringer gemt – du har muligvis ikke adgang til at redigere dette måltid.')
     return
   }
   const meals = lsRead<Meal[]>(LS_MEALS, [])
