@@ -36,6 +36,37 @@ export default function WeekPlan() {
   const [meals, setMeals] = useState<Meal[]>([])
   const [entries, setEntries] = useState<Record<number, Record<Slot, string | null>>>(emptyWeek())
   const [picker, setPicker] = useState<{ day: number; slot: Slot } | null>(null)
+
+  // "Spist"-tilstand – gemmes i localStorage pr. uge
+  const eatenLsKey = `mealplanner.eaten.${year}-W${week}`
+  const [eaten, setEaten] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(`mealplanner.eaten.${currentIsoWeek().year}-W${currentIsoWeek().week}`)
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set()
+    } catch { return new Set() }
+  })
+
+  useEffect(() => {
+    // Genindlæs når uge skifter
+    try {
+      const raw = localStorage.getItem(eatenLsKey)
+      setEaten(raw ? new Set(JSON.parse(raw) as string[]) : new Set())
+    } catch { setEaten(new Set()) }
+  }, [eatenLsKey])
+
+  useEffect(() => {
+    localStorage.setItem(eatenLsKey, JSON.stringify([...eaten]))
+  }, [eaten, eatenLsKey])
+
+  function toggleEaten(day: number, slot: Slot) {
+    const key = `${day}:${slot}`
+    setEaten(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
   const [exportOpen, setExportOpen] = useState(false)
   const [households, setHouseholds] = useState<HouseholdWithMembers[]>([])
   const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(null)
@@ -221,6 +252,8 @@ export default function WeekPlan() {
         entries={entries}
         mealsById={mealsById}
         onCellClick={(day, slot) => setPicker({ day, slot })}
+        onToggleEaten={toggleEaten}
+        eaten={eaten}
         todayDay={(() => {
           const cw = currentIsoWeek()
           if (year !== cw.year || week !== cw.week) return undefined

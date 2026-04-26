@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react'
 import { DAYS, Meal, SLOTS, SLOT_LABELS, Slot } from '../types'
 
+/** Laver en stabil nøgle for en given dag+slot-kombination */
+export function eatenKey(day: number, slot: Slot) {
+  return `${day}:${slot}`
+}
+
 const SLOT_ICON: Record<Slot, string> = {
   morgenmad: '🥣',
   snack_1: '🥐',
@@ -25,14 +30,36 @@ export function WeekTable({
   entries,
   mealsById,
   onCellClick,
+  onToggleEaten,
+  eaten = new Set(),
   todayDay,
 }: {
   entries: Record<number, Record<Slot, string | null>>
   mealsById: Record<string, Meal>
   onCellClick: (day: number, slot: Slot) => void
+  onToggleEaten: (day: number, slot: Slot) => void
+  eaten?: Set<string>
   todayDay?: number
 }) {
   const dayRefs = useRef<(HTMLDivElement | null)[]>([])
+  // Timer-refs til single/dobbelt-klik-adskillelse pr. celle
+  const clickTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
+  function handleCellClick(day: number, slot: Slot, hasMeal: boolean) {
+    const key = eatenKey(day, slot)
+    if (clickTimers.current[key]) {
+      // Andet klik inden timeout = dobbelt-klik
+      clearTimeout(clickTimers.current[key])
+      delete clickTimers.current[key]
+      if (hasMeal) onToggleEaten(day, slot)
+    } else {
+      // Første klik – vent og se om der kommer et klik mere
+      clickTimers.current[key] = setTimeout(() => {
+        delete clickTimers.current[key]
+        onCellClick(day, slot)
+      }, 220)
+    }
+  }
 
   useEffect(() => {
     if (todayDay == null) return
@@ -69,19 +96,27 @@ export function WeekTable({
                 {SLOTS.map((slot) => {
                   const mealId = row[slot]
                   const meal = mealId ? mealsById[mealId] : null
+                  const isEaten = meal ? eaten.has(eatenKey(day, slot)) : false
                   return (
                     <button
                       key={slot}
-                      onClick={() => onCellClick(day, slot)}
+                      onClick={() => handleCellClick(day, slot, !!meal)}
                       className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${SLOT_TINT[slot]} ${
                         meal ? 'hover:bg-terracotta-soft/30' : 'hover:bg-terracotta-soft/20'
-                      }`}
+                      } ${isEaten ? 'opacity-60' : ''}`}
                     >
                       <span className="text-lg shrink-0">{SLOT_ICON[slot]}</span>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs text-muted font-medium">{SLOT_LABELS[slot]}</div>
                         {meal ? (
-                          <div className="text-[13px] font-medium text-ink truncate">{meal.name}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-[13px] font-medium truncate ${isEaten ? 'line-through text-muted' : 'text-ink'}`}>
+                              {meal.name}
+                            </span>
+                            {isEaten && (
+                              <span className="shrink-0 text-emerald-500 font-bold text-sm leading-none">✓</span>
+                            )}
+                          </div>
                         ) : (
                           <div className="text-xs text-muted italic">+ vælg</div>
                         )}
@@ -132,23 +167,29 @@ export function WeekTable({
                   {SLOTS.map((slot) => {
                     const mealId = row[slot]
                     const meal = mealId ? mealsById[mealId] : null
+                    const isEaten = meal ? eaten.has(eatenKey(day, slot)) : false
                     return (
                       <td
                         key={slot}
-                        onClick={() => onCellClick(day, slot)}
-                        className={`p-2.5 align-top cursor-pointer border-l border-line/60 transition-colors ${
+                        onClick={() => handleCellClick(day, slot, !!meal)}
+                        className={`p-2.5 align-top cursor-pointer border-l border-line/60 transition-colors relative ${
                           meal ? 'hover:bg-terracotta-soft/30' : 'cell-empty hover:bg-terracotta-soft/40'
-                        }`}
+                        } ${isEaten ? 'opacity-60' : ''}`}
                       >
                         {meal ? (
                           <div>
-                            <div className="font-medium text-[13px] leading-snug text-ink">
+                            <div className={`font-medium text-[13px] leading-snug ${isEaten ? 'line-through text-muted' : 'text-ink'}`}>
                               {meal.name}
                             </div>
-                            {meal.description && (
+                            {meal.description && !isEaten && (
                               <div className="text-[11px] text-muted line-clamp-2 mt-0.5">
                                 {meal.description}
                               </div>
+                            )}
+                            {isEaten && (
+                              <span className="absolute top-1.5 right-2 text-emerald-500 font-bold text-base leading-none">
+                                ✓
+                              </span>
                             )}
                           </div>
                         ) : (
