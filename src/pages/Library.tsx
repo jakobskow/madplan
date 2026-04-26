@@ -3,6 +3,8 @@ import { Meal, Category, CATEGORIES, CATEGORY_LABELS } from '../types'
 import { listMeals, createMeal, updateMeal, deleteMeal } from '../lib/data'
 import { MealForm } from '../components/MealForm'
 import { Modal } from '../components/Modal'
+import { useSession } from '../lib/auth'
+import { getMyProfile, Profile } from '../lib/profiles'
 
 const CAT_EMOJI: Record<Category, string> = {
   morgenmad: '🥣',
@@ -19,6 +21,15 @@ const CAT_BADGE: Record<Category, string> = {
 }
 
 export default function Library() {
+  const { session, cloud } = useSession()
+  const myUserId = session?.user?.id ?? ''
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const isAdmin = profile?.role === 'admin'
+
+  useEffect(() => {
+    if (cloud) getMyProfile().then(setProfile)
+  }, [cloud])
+
   const [meals, setMeals] = useState<Meal[]>([])
   const [search, setSearch] = useState('')
   const [cat, setCat] = useState<Category | 'all'>('all')
@@ -150,9 +161,11 @@ export default function Library() {
               </div>
             )}
             <div className="flex gap-2 pt-2 border-t border-line">
-              <button className="btn btn-ghost text-xs" onClick={() => setEditing(m)}>
-                ✎ Redigér
-              </button>
+              {(isAdmin || m.user_id === myUserId) && (
+                <button className="btn btn-ghost text-xs" onClick={() => setEditing(m)}>
+                  ✎ Redigér
+                </button>
+              )}
               <button
                 className="btn btn-ghost text-xs text-red-600 hover:bg-red-50"
                 onClick={async () => {

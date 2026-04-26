@@ -33,10 +33,35 @@ create index if not exists meal_plans_week_idx on meal_plans(user_id, year, week
 alter table meals enable row level security;
 alter table meal_plans enable row level security;
 
+-- SELECT + INSERT: kun egne måltider
 drop policy if exists "meals_owner" on meals;
-create policy "meals_owner" on meals for all
-  using (auth.uid() = user_id)
+drop policy if exists "meals_select" on meals;
+drop policy if exists "meals_insert" on meals;
+drop policy if exists "meals_update" on meals;
+drop policy if exists "meals_delete" on meals;
+
+create policy "meals_select" on meals for select
+  using (auth.uid() = user_id);
+
+create policy "meals_insert" on meals for insert
   with check (auth.uid() = user_id);
+
+-- UPDATE + DELETE: egne måltider ELLER admin-rolle
+create policy "meals_update" on meals for update
+  using (
+    auth.uid() = user_id
+    OR EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role = 'admin')
+  )
+  with check (
+    auth.uid() = user_id
+    OR EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role = 'admin')
+  );
+
+create policy "meals_delete" on meals for delete
+  using (
+    auth.uid() = user_id
+    OR EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role = 'admin')
+  );
 
 drop policy if exists "plans_owner" on meal_plans;
 create policy "plans_owner" on meal_plans for all
