@@ -42,23 +42,27 @@ export function WeekTable({
   todayDay?: number
 }) {
   const dayRefs = useRef<(HTMLDivElement | null)[]>([])
-  // Timer-refs til single/dobbelt-klik-adskillelse pr. celle
-  const clickTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  // Long-press timer
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pressTarget = useRef<{ day: number; slot: Slot } | null>(null)
 
-  function handleCellClick(day: number, slot: Slot, hasMeal: boolean) {
-    const key = eatenKey(day, slot)
-    if (clickTimers.current[key]) {
-      // Andet klik inden timeout = dobbelt-klik
-      clearTimeout(clickTimers.current[key])
-      delete clickTimers.current[key]
-      if (hasMeal) onToggleEaten(day, slot)
-    } else {
-      // Første klik – vent og se om der kommer et klik mere
-      clickTimers.current[key] = setTimeout(() => {
-        delete clickTimers.current[key]
-        onCellClick(day, slot)
-      }, 220)
+  function startPress(day: number, slot: Slot, hasMeal: boolean) {
+    if (!hasMeal) return
+    pressTarget.current = { day, slot }
+    pressTimer.current = setTimeout(() => {
+      if (pressTarget.current) {
+        onToggleEaten(pressTarget.current.day, pressTarget.current.slot)
+        pressTarget.current = null
+      }
+    }, 500)
+  }
+
+  function cancelPress() {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current)
+      pressTimer.current = null
     }
+    pressTarget.current = null
   }
 
   useEffect(() => {
@@ -100,7 +104,13 @@ export function WeekTable({
                   return (
                     <button
                       key={slot}
-                      onClick={() => handleCellClick(day, slot, !!meal)}
+                      onClick={() => onCellClick(day, slot)}
+                      onMouseDown={() => startPress(day, slot, !!meal)}
+                      onMouseUp={cancelPress}
+                      onMouseLeave={cancelPress}
+                      onTouchStart={(e) => { e.preventDefault(); startPress(day, slot, !!meal) }}
+                      onTouchEnd={cancelPress}
+                      onTouchMove={cancelPress}
                       className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${SLOT_TINT[slot]} ${
                         meal ? 'hover:bg-terracotta-soft/30' : 'hover:bg-terracotta-soft/20'
                       } ${isEaten ? 'opacity-60' : ''}`}
@@ -171,8 +181,14 @@ export function WeekTable({
                     return (
                       <td
                         key={slot}
-                        onClick={() => handleCellClick(day, slot, !!meal)}
-                        className={`p-2.5 align-top cursor-pointer border-l border-line/60 transition-colors relative ${
+                        onClick={() => onCellClick(day, slot)}
+                        onMouseDown={() => startPress(day, slot, !!meal)}
+                        onMouseUp={cancelPress}
+                        onMouseLeave={cancelPress}
+                        onTouchStart={(e) => { e.preventDefault(); startPress(day, slot, !!meal) }}
+                        onTouchEnd={cancelPress}
+                        onTouchMove={cancelPress}
+                        className={`p-2.5 align-top cursor-pointer border-l border-line/60 transition-colors relative select-none ${
                           meal ? 'hover:bg-terracotta-soft/30' : 'cell-empty hover:bg-terracotta-soft/40'
                         } ${isEaten ? 'opacity-60' : ''}`}
                       >
