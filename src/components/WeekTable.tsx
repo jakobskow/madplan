@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { DAYS, Meal, SLOTS, SLOT_LABELS, Slot } from '../types'
 
-/** Laver en stabil nøgle for en given dag+slot-kombination */
 export function eatenKey(day: number, slot: Slot) {
   return `${day}:${slot}`
 }
@@ -26,6 +25,32 @@ const SLOT_TINT: Record<Slot, string> = {
   snack_4: 'bg-sage-soft/40'
 }
 
+/** Lille cirkel-knap der markerer et måltid som spist */
+function EatenButton({
+  isEaten,
+  onToggle,
+}: {
+  isEaten: boolean
+  onToggle: (e: React.MouseEvent | React.TouchEvent) => void
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      onTouchEnd={onToggle}
+      aria-label={isEaten ? 'Fjern markering' : 'Markér som spist'}
+      className={`shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors ${
+        isEaten
+          ? 'bg-emerald-500 border-emerald-500 text-white'
+          : 'border-muted/30 text-transparent hover:border-emerald-400 hover:text-emerald-400'
+      }`}
+    >
+      <svg viewBox="0 0 12 10" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="1,5 4.5,8.5 11,1" />
+      </svg>
+    </button>
+  )
+}
+
 export function WeekTable({
   entries,
   mealsById,
@@ -42,40 +67,6 @@ export function WeekTable({
   todayDay?: number
 }) {
   const dayRefs = useRef<(HTMLDivElement | null)[]>([])
-  // Long-press timer
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const pressTarget = useRef<{ day: number; slot: Slot } | null>(null)
-  // Sættes til true når long-press aktiveres, så efterfølgende onClick undertrykkes
-  const longPressActivated = useRef(false)
-
-  function startPress(day: number, slot: Slot, hasMeal: boolean) {
-    if (!hasMeal) return
-    longPressActivated.current = false
-    pressTarget.current = { day, slot }
-    pressTimer.current = setTimeout(() => {
-      if (pressTarget.current) {
-        longPressActivated.current = true
-        onToggleEaten(pressTarget.current.day, pressTarget.current.slot)
-        pressTarget.current = null
-      }
-    }, 500)
-  }
-
-  function cancelPress() {
-    if (pressTimer.current) {
-      clearTimeout(pressTimer.current)
-      pressTimer.current = null
-    }
-    pressTarget.current = null
-  }
-
-  function handleClick(day: number, slot: Slot) {
-    if (longPressActivated.current) {
-      longPressActivated.current = false
-      return // Undertrykker click der kommer efter long-press på mobil
-    }
-    onCellClick(day, slot)
-  }
 
   useEffect(() => {
     if (todayDay == null) return
@@ -114,36 +105,33 @@ export function WeekTable({
                   const meal = mealId ? mealsById[mealId] : null
                   const isEaten = meal ? eaten.has(eatenKey(day, slot)) : false
                   return (
-                    <button
+                    <div
                       key={slot}
-                      onClick={() => handleClick(day, slot)}
-                      onMouseDown={() => startPress(day, slot, !!meal)}
-                      onMouseUp={cancelPress}
-                      onMouseLeave={cancelPress}
-                      onTouchStart={() => startPress(day, slot, !!meal)}
-                      onTouchEnd={cancelPress}
-                      onTouchMove={cancelPress}
-                      className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${SLOT_TINT[slot]} ${
-                        meal ? 'hover:bg-terracotta-soft/30' : 'hover:bg-terracotta-soft/20'
-                      } ${isEaten ? 'opacity-60' : ''}`}
+                      className={`px-4 py-3 flex items-center gap-3 ${SLOT_TINT[slot]} ${isEaten ? 'opacity-60' : ''}`}
                     >
                       <span className="text-lg shrink-0">{SLOT_ICON[slot]}</span>
-                      <div className="flex-1 min-w-0">
+                      {/* Klikbart område → åbner picker */}
+                      <button
+                        onClick={() => onCellClick(day, slot)}
+                        className="flex-1 min-w-0 text-left"
+                      >
                         <div className="text-xs text-muted font-medium">{SLOT_LABELS[slot]}</div>
                         {meal ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className={`text-[13px] font-medium truncate ${isEaten ? 'line-through text-muted' : 'text-ink'}`}>
-                              {meal.name}
-                            </span>
-                            {isEaten && (
-                              <span className="shrink-0 text-emerald-500 font-bold text-sm leading-none">✓</span>
-                            )}
+                          <div className={`text-[13px] font-medium truncate ${isEaten ? 'line-through text-muted' : 'text-ink'}`}>
+                            {meal.name}
                           </div>
                         ) : (
                           <div className="text-xs text-muted italic">+ vælg</div>
                         )}
-                      </div>
-                    </button>
+                      </button>
+                      {/* Spist-knap – kun når der er et måltid */}
+                      {meal && (
+                        <EatenButton
+                          isEaten={isEaten}
+                          onToggle={(e) => { e.stopPropagation(); onToggleEaten(day, slot) }}
+                        />
+                      )}
+                    </div>
                   )
                 })}
               </div>
@@ -180,7 +168,7 @@ export function WeekTable({
               return (
                 <tr
                   key={day}
-                  className={`border-b border-line last:border-0 ${isToday ? 'bg-terracotta/5 hover:bg-terracotta/10' : 'hover:bg-cream/40'}`}
+                  className={`border-b border-line last:border-0 ${isToday ? 'bg-terracotta/5' : ''}`}
                 >
                   <td className="p-3 align-top font-display text-ink">
                     <div className="text-[15px]">{dayName}</div>
@@ -193,37 +181,37 @@ export function WeekTable({
                     return (
                       <td
                         key={slot}
-                        onClick={() => handleClick(day, slot)}
-                        onMouseDown={() => startPress(day, slot, !!meal)}
-                        onMouseUp={cancelPress}
-                        onMouseLeave={cancelPress}
-                        onTouchStart={() => startPress(day, slot, !!meal)}
-                        onTouchEnd={cancelPress}
-                        onTouchMove={cancelPress}
-                        className={`p-2.5 align-top cursor-pointer border-l border-line/60 transition-colors relative select-none ${
-                          meal ? 'hover:bg-terracotta-soft/30' : 'cell-empty hover:bg-terracotta-soft/40'
-                        } ${isEaten ? 'opacity-60' : ''}`}
+                        className={`p-2.5 align-top border-l border-line/60 ${isEaten ? 'opacity-60' : ''}`}
                       >
                         {meal ? (
-                          <div>
-                            <div className={`font-medium text-[13px] leading-snug ${isEaten ? 'line-through text-muted' : 'text-ink'}`}>
-                              {meal.name}
-                            </div>
-                            {meal.description && !isEaten && (
-                              <div className="text-[11px] text-muted line-clamp-2 mt-0.5">
-                                {meal.description}
+                          <div className="flex items-start gap-1.5">
+                            {/* Klikbart område → åbner picker */}
+                            <button
+                              onClick={() => onCellClick(day, slot)}
+                              className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+                            >
+                              <div className={`font-medium text-[13px] leading-snug ${isEaten ? 'line-through text-muted' : 'text-ink'}`}>
+                                {meal.name}
                               </div>
-                            )}
-                            {isEaten && (
-                              <span className="absolute top-1.5 right-2 text-emerald-500 font-bold text-base leading-none">
-                                ✓
-                              </span>
-                            )}
+                              {meal.description && !isEaten && (
+                                <div className="text-[11px] text-muted line-clamp-2 mt-0.5">
+                                  {meal.description}
+                                </div>
+                              )}
+                            </button>
+                            {/* Spist-knap */}
+                            <EatenButton
+                              isEaten={isEaten}
+                              onToggle={(e) => { e.stopPropagation(); onToggleEaten(day, slot) }}
+                            />
                           </div>
                         ) : (
-                          <div className="text-xs text-muted italic flex items-center justify-center h-10">
+                          <button
+                            onClick={() => onCellClick(day, slot)}
+                            className="w-full h-10 text-xs text-muted italic flex items-center justify-center hover:bg-terracotta-soft/40 transition-colors rounded"
+                          >
                             + vælg
-                          </div>
+                          </button>
                         )}
                       </td>
                     )
