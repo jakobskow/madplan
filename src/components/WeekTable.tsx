@@ -45,12 +45,16 @@ export function WeekTable({
   // Long-press timer
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pressTarget = useRef<{ day: number; slot: Slot } | null>(null)
+  // Sættes til true når long-press aktiveres, så efterfølgende onClick undertrykkes
+  const longPressActivated = useRef(false)
 
   function startPress(day: number, slot: Slot, hasMeal: boolean) {
     if (!hasMeal) return
+    longPressActivated.current = false
     pressTarget.current = { day, slot }
     pressTimer.current = setTimeout(() => {
       if (pressTarget.current) {
+        longPressActivated.current = true
         onToggleEaten(pressTarget.current.day, pressTarget.current.slot)
         pressTarget.current = null
       }
@@ -63,6 +67,14 @@ export function WeekTable({
       pressTimer.current = null
     }
     pressTarget.current = null
+  }
+
+  function handleClick(day: number, slot: Slot) {
+    if (longPressActivated.current) {
+      longPressActivated.current = false
+      return // Undertrykker click der kommer efter long-press på mobil
+    }
+    onCellClick(day, slot)
   }
 
   useEffect(() => {
@@ -104,11 +116,11 @@ export function WeekTable({
                   return (
                     <button
                       key={slot}
-                      onClick={() => onCellClick(day, slot)}
+                      onClick={() => handleClick(day, slot)}
                       onMouseDown={() => startPress(day, slot, !!meal)}
                       onMouseUp={cancelPress}
                       onMouseLeave={cancelPress}
-                      onTouchStart={(e) => { e.preventDefault(); startPress(day, slot, !!meal) }}
+                      onTouchStart={() => startPress(day, slot, !!meal)}
                       onTouchEnd={cancelPress}
                       onTouchMove={cancelPress}
                       className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${SLOT_TINT[slot]} ${
@@ -181,11 +193,11 @@ export function WeekTable({
                     return (
                       <td
                         key={slot}
-                        onClick={() => onCellClick(day, slot)}
+                        onClick={() => handleClick(day, slot)}
                         onMouseDown={() => startPress(day, slot, !!meal)}
                         onMouseUp={cancelPress}
                         onMouseLeave={cancelPress}
-                        onTouchStart={(e) => { e.preventDefault(); startPress(day, slot, !!meal) }}
+                        onTouchStart={() => startPress(day, slot, !!meal)}
                         onTouchEnd={cancelPress}
                         onTouchMove={cancelPress}
                         className={`p-2.5 align-top cursor-pointer border-l border-line/60 transition-colors relative select-none ${
