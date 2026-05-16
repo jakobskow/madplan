@@ -1,11 +1,11 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { DAYS, Meal, SLOTS, SLOT_LABELS, Slot } from '../../types'
+import { DAYS, Meal, SLOTS, SLOT_LABELS, Slot, SlotEntry, EMPTY_SLOT_ENTRY } from '../../types'
 
 export function exportWeekPdf(
   year: number,
   week: number,
-  entries: Record<number, Record<Slot, string | null>>,
+  entries: Record<number, Record<Slot, SlotEntry>>,
   mealsById: Record<string, Meal>
 ) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
@@ -16,14 +16,15 @@ export function exportWeekPdf(
   const head = [['Dag', ...SLOTS.map((s) => SLOT_LABELS[s])]]
   const body = DAYS.map((dayName, idx) => {
     const day = idx + 1
-    const row = entries[day] ?? ({} as Record<Slot, string | null>)
+    const row = entries[day] ?? ({} as Record<Slot, SlotEntry>)
     return [
       dayName,
       ...SLOTS.map((slot) => {
-        const mealId = row[slot]
-        const meal = mealId ? mealsById[mealId] : null
-        if (!meal) return ''
-        return meal.description ? `${meal.name}\n${meal.description}` : meal.name
+        const se = row[slot] ?? EMPTY_SLOT_ENTRY
+        const meal = se.meal_id ? mealsById[se.meal_id] : null
+        if (meal) return meal.description ? `${meal.name}\n${meal.description}` : meal.name
+        if (se.freetext) return `* ${se.freetext}`
+        return ''
       })
     ]
   })

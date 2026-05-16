@@ -1,5 +1,5 @@
 import { supabase, hasSupabase } from './supabase'
-import { Meal, MealPlanEntry, Slot } from '../types'
+import { Meal, MealPlanEntry, Slot, SlotEntry } from '../types'
 import { SEED_MEALS } from './seed'
 
 // Abstract data layer:
@@ -142,6 +142,7 @@ export async function upsertPlanEntry(
       p_slot:         entry.slot,
       p_meal_id:      entry.meal_id ?? null,
       p_household_id: householdId ?? null,
+      p_freetext:     entry.freetext ?? null,
     })
     if (error) throw error
     return
@@ -154,8 +155,8 @@ export async function upsertPlanEntry(
       p.day_of_week === entry.day_of_week &&
       p.slot === entry.slot
   )
-  if (idx >= 0) plans[idx] = { ...plans[idx], meal_id: entry.meal_id }
-  else plans.push({ id: uuid(), ...entry })
+  if (idx >= 0) plans[idx] = { ...plans[idx], meal_id: entry.meal_id, freetext: entry.freetext ?? null }
+  else plans.push({ id: uuid(), ...entry, freetext: entry.freetext ?? null })
   lsWrite(LS_PLANS, plans)
 }
 
@@ -182,13 +183,14 @@ export async function clearWeek(
 export async function setWeekEntries(
   year: number,
   week: number,
-  entries: Record<number, Record<Slot, string | null>>,
+  entries: Record<number, Record<Slot, SlotEntry>>,
   householdId?: string | null
 ): Promise<void> {
   const rows: MealPlanEntry[] = []
   for (const day of Object.keys(entries).map(Number)) {
     for (const slot of Object.keys(entries[day]) as Slot[]) {
-      rows.push({ year, week, day_of_week: day, slot, meal_id: entries[day][slot] })
+      const se = entries[day][slot]
+      rows.push({ year, week, day_of_week: day, slot, meal_id: se.meal_id, freetext: se.freetext })
     }
   }
 
@@ -197,6 +199,7 @@ export async function setWeekEntries(
       day_of_week: r.day_of_week,
       slot:        r.slot,
       meal_id:     r.meal_id ?? null,
+      freetext:    r.freetext ?? null,
     }))
     const { error } = await supabase!.rpc('set_week_entries', {
       p_year:         year,
@@ -207,5 +210,5 @@ export async function setWeekEntries(
     if (error) throw error
     return
   }
-  for (const r of rows) await upsertPlanEntry(r)
+  for (const r of rows) await upsertPlanEntry(r, householdId)
 }

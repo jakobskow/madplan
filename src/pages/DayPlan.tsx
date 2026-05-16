@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { DAYS, Meal, Slot, SLOTS, SLOT_LABELS, slotCategory } from '../types'
+import { DAYS, Meal, Slot, SLOTS, SLOT_LABELS, SlotEntry, EMPTY_SLOT_ENTRY, slotCategory } from '../types'
 import { listMeals, listWeekPlan, upsertPlanEntry } from '../lib/data'
 import { MealPicker } from '../components/MealPicker'
 import { currentIsoWeek, isoDayOfWeek } from '../lib/iso-week'
@@ -15,8 +15,8 @@ export default function DayPlan() {
   const [{ year, week }] = useState(currentIsoWeek())
   const [day, setDay] = useState(isoDayOfWeek(new Date()))
   const [meals, setMeals] = useState<Meal[]>([])
-  const [entries, setEntries] = useState<Record<Slot, string | null>>(
-    Object.fromEntries(SLOTS.map((s) => [s, null])) as Record<Slot, string | null>
+  const [entries, setEntries] = useState<Record<Slot, SlotEntry>>(
+    Object.fromEntries(SLOTS.map((s) => [s, { ...EMPTY_SLOT_ENTRY }])) as Record<Slot, SlotEntry>
   )
   const [picker, setPicker] = useState<Slot | null>(null)
   const [households, setHouseholds] = useState<HouseholdWithMembers[]>([])
@@ -44,8 +44,8 @@ export default function DayPlan() {
   async function load() {
     setMeals(await listMeals())
     const plan = await listWeekPlan(year, week, selectedHouseholdId)
-    const row = Object.fromEntries(SLOTS.map((s) => [s, null])) as Record<Slot, string | null>
-    for (const p of plan) if (p.day_of_week === day) row[p.slot] = p.meal_id ?? null
+    const row = Object.fromEntries(SLOTS.map((s) => [s, { ...EMPTY_SLOT_ENTRY }])) as Record<Slot, SlotEntry>
+    for (const p of plan) if (p.day_of_week === day) row[p.slot] = { meal_id: p.meal_id ?? null, freetext: p.freetext ?? null }
     setEntries(row)
   }
 
@@ -60,15 +60,22 @@ export default function DayPlan() {
     return m
   }, [meals])
 
-  async function set(slot: Slot, mealId: string | null) {
-    setEntries((prev) => ({ ...prev, [slot]: mealId }))
-    await upsertPlanEntry({ year, week, day_of_week: day, slot, meal_id: mealId }, selectedHouseholdId)
+  async function setSlot(slot: Slot, next: SlotEntry) {
+    setEntries((prev) => ({ ...prev, [slot]: next }))
+    await upsertPlanEntry(
+      { year, week, day_of_week: day, slot, meal_id: next.meal_id, freetext: next.freetext },
+      selectedHouseholdId
+    )
   }
 
   async function randomize() {
     const r = randomDay(meals)
     setEntries(r)
-    for (const s of SLOTS) await upsertPlanEntry({ year, week, day_of_week: day, slot: s, meal_id: r[s] }, selectedHouseholdId)
+    for (const s of SLOTS)
+      await upsertPlanEntry(
+        { year, week, day_of_week: day, slot: s, meal_id: r[s].meal_id, freetext: r[s].freetext },
+        selectedHouseholdId
+      )
   }
 
   const SLOT_ICON: Record<Slot, string> = {
@@ -78,7 +85,8 @@ export default function DayPlan() {
     snack_2: '🍎',
     snack_3: '🥕',
     aftensmad: '🍲',
-    snack_4: '🍪'
+    snack_4: '🍪',
+    extra_snack: '✨'
   }
 
   return (
@@ -127,13 +135,16 @@ export default function DayPlan() {
 
       <div className="grid sm:grid-cols-2 gap-3">
         {SLOTS.map((slot) => {
-          const m = entries[slot] ? mealsById[entries[slot]!] : null
+          const se = entries[slot] ?? EMPTY_SLOT_ENTRY
+          const m = se.meal_id ? mealsById[se.meal_id] : null
+          const ft = se.freetext
+          const hasContent = !!m || !!ft
           return (
             <button
               key={slot}
               onClick={() => setPicker(slot)}
               className={`text-left card p-4 transition-all hover:shadow-lg hover:-translate-y-0.5 ${
-                m ? '' : 'cell-empty'
+                hasContent ? '' : 'cell-empty'
               }`}
             >
               <div className="text-xs text-muted uppercase tracking-wide flex items-center gap-1.5 mb-1.5">
@@ -149,6 +160,15 @@ export default function DayPlan() {
                     <div className="text-sm text-muted mt-1">{m.description}</div>
                   )}
                 </>
+              ) : ft ? (
+                <>
+                  <div className="font-display text-lg font-semibold text-ink leading-tight">
+                    {ft}
+                  </div>
+                  <div className="text-xs text-muted mt-1 flex items-center gap-1">
+                    <span>✏️</span> On the fly
+                  </div>
+                </>
               ) : (
                 <div className="text-muted italic">+ vælg måltid</div>
               )}
@@ -162,11 +182,15 @@ export default function DayPlan() {
           meals={meals}
           category={slotCategory(picker)}
           onPick={(id) => {
-            set(picker, id)
+            setSlot(picker, { meal_id: id, freetext: null })
+            setPicker(null)
+          }}
+          onFreetext={(text) => {
+            setSlot(picker, { meal_id: null, freetext: text })
             setPicker(null)
           }}
           onClear={() => {
-            set(picker, null)
+            setSlot(picker, { meal_id: null, freetext: null })
             setPicker(null)
           }}
           onClose={() => setPicker(null)}

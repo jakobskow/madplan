@@ -12,12 +12,12 @@ import {
   HeightRule
 } from 'docx'
 import { saveAs } from 'file-saver'
-import { DAYS, Meal, SLOTS, SLOT_LABELS, Slot } from '../../types'
+import { DAYS, Meal, SLOTS, SLOT_LABELS, Slot, SlotEntry, EMPTY_SLOT_ENTRY } from '../../types'
 
 export async function exportWeekDocx(
   year: number,
   week: number,
-  entries: Record<number, Record<Slot, string | null>>,
+  entries: Record<number, Record<Slot, SlotEntry>>,
   mealsById: Record<string, Meal>
 ) {
   const header = new TableRow({
@@ -41,13 +41,13 @@ export async function exportWeekDocx(
 
   const rows = DAYS.map((dayName, idx) => {
     const day = idx + 1
-    const row = entries[day] ?? ({} as Record<Slot, string | null>)
+    const row = entries[day] ?? ({} as Record<Slot, SlotEntry>)
     return new TableRow({
       children: [
         new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: dayName })] })] }),
         ...SLOTS.map((slot) => {
-          const mealId = row[slot]
-          const meal = mealId ? mealsById[mealId] : null
+          const se = row[slot] ?? EMPTY_SLOT_ENTRY
+          const meal = se.meal_id ? mealsById[se.meal_id] : null
           const paras: Paragraph[] = []
           if (meal) {
             paras.push(new Paragraph({ children: [new TextRun({ text: meal.name, bold: true })] }))
@@ -57,6 +57,8 @@ export async function exportWeekDocx(
                   children: [new TextRun({ text: meal.description, size: 18 })]
                 })
               )
+          } else if (se.freetext) {
+            paras.push(new Paragraph({ children: [new TextRun({ text: se.freetext, italics: true })] }))
           } else {
             paras.push(new Paragraph({ children: [new TextRun({ text: '' })] }))
           }

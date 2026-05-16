@@ -23,8 +23,9 @@ create table if not exists meal_plans (
   year int not null,
   week int not null check (week between 1 and 53),
   day_of_week int not null check (day_of_week between 1 and 7),
-  slot text not null check (slot in ('morgenmad','snack_1','frokost','snack_2','snack_3','aftensmad','snack_4')),
+  slot text not null check (slot in ('morgenmad','snack_1','frokost','snack_2','snack_3','aftensmad','snack_4','extra_snack')),
   meal_id uuid references meals on delete set null,
+  freetext text,
   unique (user_id, year, week, day_of_week, slot)
 );
 

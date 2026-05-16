@@ -6,19 +6,32 @@ export function MealPicker({
   meals,
   category,
   onPick,
+  onFreetext,
   onClear,
   onClose
 }: {
   meals: Meal[]
-  category: Category
+  category: Category | null
   onPick: (mealId: string) => void
+  onFreetext: (text: string) => void
   onClear: () => void
   onClose: () => void
 }) {
   const [search, setSearch] = useState('')
   const [activeTags, setActiveTags] = useState<string[]>([])
+  const [freetext, setFreetext] = useState('')
 
-  const relevant = useMemo(() => meals.filter((m) => m.category === category), [meals, category])
+  function submitFreetext() {
+    const trimmed = freetext.trim()
+    if (!trimmed) return
+    onFreetext(trimmed)
+    setFreetext('')
+  }
+
+  const relevant = useMemo(
+    () => (category === null ? meals : meals.filter((m) => m.category === category)),
+    [meals, category]
+  )
   const allTags = useMemo(() => Array.from(new Set(relevant.flatMap((m) => m.tags))).sort(), [relevant])
 
   const filtered = relevant.filter((m) => {
@@ -36,7 +49,7 @@ export function MealPicker({
   }
 
   return (
-    <Modal title={`Vælg ${CATEGORY_LABELS[category]}`} onClose={onClose} wide>
+    <Modal title={`Vælg ${category === null ? 'ekstra snack' : CATEGORY_LABELS[category]}`} onClose={onClose} wide>
       <div className="space-y-3">
         <div className="flex gap-2 flex-wrap items-center">
           <input
@@ -48,6 +61,32 @@ export function MealPicker({
           <button className="btn btn-secondary" onClick={onClear}>
             Ryd slot
           </button>
+        </div>
+        <div className="card p-3 bg-mustard/10 border border-mustard/30">
+          <div className="text-xs text-muted uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+            <span>✏️</span> On the fly
+          </div>
+          <div className="flex gap-2">
+            <input
+              className="input flex-1"
+              placeholder="Write anything…"
+              value={freetext}
+              onChange={(e) => setFreetext(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  submitFreetext()
+                }
+              }}
+            />
+            <button
+              className="btn btn-primary"
+              onClick={submitFreetext}
+              disabled={!freetext.trim()}
+            >
+              Tilføj
+            </button>
+          </div>
         </div>
         {allTags.length > 0 && (
           <div>

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { DAYS, Meal, SLOTS, SLOT_LABELS, Slot } from '../types'
+import { DAYS, Meal, SLOTS, SLOT_LABELS, Slot, SlotEntry, EMPTY_SLOT_ENTRY } from '../types'
 
 export function eatenKey(day: number, slot: Slot) {
   return `${day}:${slot}`
@@ -12,7 +12,8 @@ const SLOT_ICON: Record<Slot, string> = {
   snack_2: '🍎',
   snack_3: '🥕',
   aftensmad: '🍲',
-  snack_4: '🍪'
+  snack_4: '🍪',
+  extra_snack: '✨'
 }
 
 const SLOT_TINT: Record<Slot, string> = {
@@ -22,7 +23,8 @@ const SLOT_TINT: Record<Slot, string> = {
   snack_2: 'bg-sage-soft/40',
   snack_3: 'bg-sage-soft/40',
   aftensmad: 'bg-terracotta-soft/40',
-  snack_4: 'bg-sage-soft/40'
+  snack_4: 'bg-sage-soft/40',
+  extra_snack: 'bg-mustard/20'
 }
 
 /** Lille cirkel-knap der markerer et måltid som spist */
@@ -59,7 +61,7 @@ export function WeekTable({
   eaten = new Set(),
   todayDay,
 }: {
-  entries: Record<number, Record<Slot, string | null>>
+  entries: Record<number, Record<Slot, SlotEntry>>
   mealsById: Record<string, Meal>
   onCellClick: (day: number, slot: Slot) => void
   onToggleEaten: (day: number, slot: Slot) => void
@@ -84,7 +86,7 @@ export function WeekTable({
         {DAYS.map((dayName, idx) => {
           const day = idx + 1
           const isToday = todayDay === day
-          const row = entries[day] ?? ({} as Record<Slot, string | null>)
+          const row = entries[day] ?? ({} as Record<Slot, SlotEntry>)
           return (
             <div
               key={day}
@@ -101,9 +103,11 @@ export function WeekTable({
               </div>
               <div className="divide-y divide-line">
                 {SLOTS.map((slot) => {
-                  const mealId = row[slot]
-                  const meal = mealId ? mealsById[mealId] : null
-                  const isEaten = meal ? eaten.has(eatenKey(day, slot)) : false
+                  const se = row[slot] ?? EMPTY_SLOT_ENTRY
+                  const meal = se.meal_id ? mealsById[se.meal_id] : null
+                  const ft = se.freetext
+                  const hasContent = !!meal || !!ft
+                  const isEaten = hasContent ? eaten.has(eatenKey(day, slot)) : false
                   return (
                     <div
                       key={slot}
@@ -120,12 +124,16 @@ export function WeekTable({
                           <div className={`text-[13px] font-medium truncate ${isEaten ? 'line-through text-muted' : 'text-ink'}`}>
                             {meal.name}
                           </div>
+                        ) : ft ? (
+                          <div className={`text-[13px] font-medium truncate ${isEaten ? 'line-through text-muted' : 'text-ink'}`}>
+                            ✏️ {ft}
+                          </div>
                         ) : (
                           <div className="text-xs text-muted italic">+ vælg</div>
                         )}
                       </button>
-                      {/* Spist-knap – kun når der er et måltid */}
-                      {meal && (
+                      {/* Spist-knap – kun når der er indhold */}
+                      {hasContent && (
                         <EatenButton
                           isEaten={isEaten}
                           onToggle={(e) => { e.stopPropagation(); onToggleEaten(day, slot) }}
@@ -164,7 +172,7 @@ export function WeekTable({
             {DAYS.map((dayName, idx) => {
               const day = idx + 1
               const isToday = todayDay === day
-              const row = entries[day] ?? ({} as Record<Slot, string | null>)
+              const row = entries[day] ?? ({} as Record<Slot, SlotEntry>)
               return (
                 <tr
                   key={day}
@@ -175,27 +183,37 @@ export function WeekTable({
                     {isToday && <div className="text-[10px] text-terracotta font-medium mt-0.5">I dag</div>}
                   </td>
                   {SLOTS.map((slot) => {
-                    const mealId = row[slot]
-                    const meal = mealId ? mealsById[mealId] : null
-                    const isEaten = meal ? eaten.has(eatenKey(day, slot)) : false
+                    const se = row[slot] ?? EMPTY_SLOT_ENTRY
+                    const meal = se.meal_id ? mealsById[se.meal_id] : null
+                    const ft = se.freetext
+                    const hasContent = !!meal || !!ft
+                    const isEaten = hasContent ? eaten.has(eatenKey(day, slot)) : false
                     return (
                       <td
                         key={slot}
                         className={`p-2.5 align-top border-l border-line/60 ${isEaten ? 'opacity-60' : ''}`}
                       >
-                        {meal ? (
+                        {hasContent ? (
                           <div className="flex items-start gap-1.5">
                             {/* Klikbart område → åbner picker */}
                             <button
                               onClick={() => onCellClick(day, slot)}
                               className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
                             >
-                              <div className={`font-medium text-[13px] leading-snug ${isEaten ? 'line-through text-muted' : 'text-ink'}`}>
-                                {meal.name}
-                              </div>
-                              {meal.description && !isEaten && (
-                                <div className="text-[11px] text-muted line-clamp-2 mt-0.5">
-                                  {meal.description}
+                              {meal ? (
+                                <>
+                                  <div className={`font-medium text-[13px] leading-snug ${isEaten ? 'line-through text-muted' : 'text-ink'}`}>
+                                    {meal.name}
+                                  </div>
+                                  {meal.description && !isEaten && (
+                                    <div className="text-[11px] text-muted line-clamp-2 mt-0.5">
+                                      {meal.description}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className={`font-medium text-[13px] leading-snug ${isEaten ? 'line-through text-muted' : 'text-ink'}`}>
+                                  ✏️ {ft}
                                 </div>
                               )}
                             </button>

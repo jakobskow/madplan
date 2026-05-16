@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Meal, Slot, SLOTS, slotCategory } from '../types'
+import { Meal, Slot, SLOTS, SlotEntry, EMPTY_SLOT_ENTRY, slotCategory } from '../types'
 import { WeekTable } from '../components/WeekTable'
 import { MealPicker } from '../components/MealPicker'
 import {
@@ -18,11 +18,11 @@ import { getMyHouseholds, HouseholdWithMembers } from '../lib/households'
 import { useSession } from '../lib/auth'
 import { getDefaultHouseholdId, setDefaultHouseholdId } from '../lib/defaultHousehold'
 
-function emptyWeek(): Record<number, Record<Slot, string | null>> {
-  const out: Record<number, Record<Slot, string | null>> = {}
+function emptyWeek(): Record<number, Record<Slot, SlotEntry>> {
+  const out: Record<number, Record<Slot, SlotEntry>> = {}
   for (let d = 1; d <= 7; d++) {
-    const row = {} as Record<Slot, string | null>
-    for (const s of SLOTS) row[s] = null
+    const row = {} as Record<Slot, SlotEntry>
+    for (const s of SLOTS) row[s] = { ...EMPTY_SLOT_ENTRY }
     out[d] = row
   }
   return out
@@ -34,7 +34,7 @@ export default function WeekPlan() {
 
   const [{ year, week }, setYW] = useState(currentIsoWeek())
   const [meals, setMeals] = useState<Meal[]>([])
-  const [entries, setEntries] = useState<Record<number, Record<Slot, string | null>>>(emptyWeek())
+  const [entries, setEntries] = useState<Record<number, Record<Slot, SlotEntry>>>(emptyWeek())
   const [picker, setPicker] = useState<{ day: number; slot: Slot } | null>(null)
 
   // "Spist"-tilstand – gemmes i localStorage pr. uge
@@ -98,8 +98,8 @@ export default function WeekPlan() {
     const plan = await listWeekPlan(year, week, selectedHouseholdId)
     const base = emptyWeek()
     for (const p of plan) {
-      if (!base[p.day_of_week]) base[p.day_of_week] = {} as Record<Slot, string | null>
-      base[p.day_of_week][p.slot] = p.meal_id ?? null
+      if (!base[p.day_of_week]) base[p.day_of_week] = {} as Record<Slot, SlotEntry>
+      base[p.day_of_week][p.slot] = { meal_id: p.meal_id ?? null, freetext: p.freetext ?? null }
     }
     setEntries(base)
   }
@@ -115,10 +115,13 @@ export default function WeekPlan() {
     return m
   }, [meals])
 
-  async function pickMeal(day: number, slot: Slot, mealId: string | null) {
-    const next = { ...entries, [day]: { ...entries[day], [slot]: mealId } }
-    setEntries(next)
-    await upsertPlanEntry({ year, week, day_of_week: day, slot, meal_id: mealId }, selectedHouseholdId)
+  async function setSlot(day: number, slot: Slot, next: SlotEntry) {
+    const updated = { ...entries, [day]: { ...entries[day], [slot]: next } }
+    setEntries(updated)
+    await upsertPlanEntry(
+      { year, week, day_of_week: day, slot, meal_id: next.meal_id, freetext: next.freetext },
+      selectedHouseholdId
+    )
   }
 
   async function randomizeWeek() {
@@ -133,7 +136,10 @@ export default function WeekPlan() {
     const next = { ...entries, [day]: dayRes }
     setEntries(next)
     for (const s of SLOTS) {
-      await upsertPlanEntry({ year, week, day_of_week: day, slot: s, meal_id: dayRes[s] }, selectedHouseholdId)
+      await upsertPlanEntry(
+        { year, week, day_of_week: day, slot: s, meal_id: dayRes[s].meal_id, freetext: dayRes[s].freetext },
+        selectedHouseholdId
+      )
     }
   }
 
@@ -266,11 +272,15 @@ export default function WeekPlan() {
           meals={meals}
           category={slotCategory(picker.slot)}
           onPick={(id) => {
-            pickMeal(picker.day, picker.slot, id)
+            setSlot(picker.day, picker.slot, { meal_id: id, freetext: null })
+            setPicker(null)
+          }}
+          onFreetext={(text) => {
+            setSlot(picker.day, picker.slot, { meal_id: null, freetext: text })
             setPicker(null)
           }}
           onClear={() => {
-            pickMeal(picker.day, picker.slot, null)
+            setSlot(picker.day, picker.slot, { meal_id: null, freetext: null })
             setPicker(null)
           }}
           onClose={() => setPicker(null)}
